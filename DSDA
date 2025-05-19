@@ -1,0 +1,374 @@
+import torch
+import numpy as np
+import spacy
+from scipy.spatial.distance import cosine
+import os
+import pickle
+import json
+import string
+import re
+import copy
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.mixture import GaussianMixture
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+nlp = spacy.load("en_core_web_sm")
+punctuation = string.punctuation
+pattern = re.compile(f'[{re.escape(punctuation)}]')
+
+class HF_Words_Thesaurus():
+    def __init__(self, cfg):
+
+        file_path = os.path.join(cfg['HF_lexicon_root'], cfg['dataset_name'], "keywords_data.json")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            loaded_data = json.load(f)
+
+        self.keywords = loaded_data["keywords"]
+        self.v_keywords = loaded_data["v_keywords"]
+
+        self.cluster_number = loaded_data["cluster_num"]
+        self.sc_feat_c = torch.zeros(self.cluster_number, cfg['q_feat_size'])
+        self.deviation_feat_c = torch.zeros(cfg['q_feat_size'])
+
+        self.sc_feat_f = torch.zeros(self.cluster_number, cfg['q_feat_size'])
+        self.deviation_feat_f = torch.zeros(cfg['q_feat_size'])
+        self.sc_feat_n = torch.ones(self.cluster_number)
+        # self.re_clip_feature = torch.zeros(self.hf_keywords_number, cfg['feature_dim'])
+        # self.re_frame_feature = torch.zeros(self.hf_keywords_number, cfg['feature_dim'])
+        self.total_feature_num = 1
+
+    def dictionary_reorder(self, words_dict):
+        sorted_keys = sorted(words_dict.items(), key=lambda item: item[1], reverse=True)
+        return [key for key, value in sorted_keys]
+
+    def cosine_similarity(self, vec1, vec2):
+        dot_product = np.dot(vec1, vec2)
+        norm_a = np.linalg.norm(vec1)
+        norm_b = np.linalg.norm(vec2)
+        return dot_product / (norm_a * norm_b)
+
+    def get_hf_keywords(self, keyword, k):  # 改成张量计算
+        temp_dict = dict()
+        for key in self.hf_keywords:
+            temp_dict[key] = self.cosine_similarity(self.glove_model[keyword], self.glove_model[key])
+        sorted_keys = sorted(temp_dict.items(), key=lambda item: item[1], reverse=True)
+        similarity_score = [[key, value] for key, value in sorted_keys][:k]
+        return similarity_score
+
+    def text_keyword_extraction(self, caption, keywords_dict):
+        caption_new = []
+        for lange in caption.split():
+            # 是否检测文本重复，如果检测是否删除文本截断
+            if lange in keywords_dict:
+                caption_new.append(lange)
+        return caption_new
+
+    def text_mask_generate(self, caption, condition):
+        caption_mask = [0] * self.cluster_number
+        if condition == "train":
+            for lange in caption.split():
+                if lange in self.keywords:
+                    caption_mask[self.keywords[lange]] = 1
+            return caption_mask
+
+        if condition == "val":
+            for lange in caption.split():
+                if lange in self.v_keywords:
+                    caption_mask[self.v_keywords[lange]] = 1
+            return caption_mask
+
+    def sc_feat_generate(self, caption, condition):
+        caption_mask_v = [0] * self.cluster_number
+        # sc_feat = []
+        caption_mask_t = []
+        if condition == "train":
+            for lange in caption.split():
+                if lange in self.keywords:
+                    # num = self.keywords[lange]
+                    # if num not in caption_mask:
+                    caption_mask_v[self.keywords[lange]] = 1
+                    caption_mask_t.append(self.keywords[lange])
+            return caption_mask_t, caption_mask_v
+
+        if condition == "val":
+            for lange in caption.split():
+                if lange in self.v_keywords:
+                    caption_mask_v[self.v_keywords[lange]] = 1
+                    # sc_feat.append(self.sc_feat_c[self.v_keywords[lange]])
+                    # num = self.v_keywords[lange]
+                    # if num not in caption_mask:
+                    caption_mask_t.append(self.v_keywords[lange])
+            return caption_mask_t, caption_mask_v
+
+    def text_enhance_2(self, video_ori_feat, keywords_masks, temporal, query_labels, epoch):
+        ori_clip_feat = video_ori_feat[0].clone().detach()
+        ori_frame_feat = video_ori_feat[1].clone().detach()
+        device = ori_clip_feat.device
+        E = ori_clip_feat.shape[-1]
+        cluster_n = self.cluster_number
+        clip_temporal = temporal[0].clone().detach().t()  # 视频*文本
+        frame_temporal = temporal[1].clone().detach().t()
+        # keywords_masks = torch.tensor(keywords_masks).to(device)
+
+        expand_clip_feat = torch.diag(clip_temporal[query_labels])[..., None, None].repeat(1, 1, E)
+        expand_frame_feat = torch.diag(frame_temporal[query_labels])[..., None, None].repeat(1, 1, E)
+
+        key_clip_feat = torch.gather(ori_clip_feat[query_labels], dim=1, index=expand_clip_feat).squeeze(1)
+        key_frame_feat = torch.gather(ori_frame_feat[query_labels], dim=1, index=expand_frame_feat).squeeze(1)
+        expand_mask = keywords_masks.unsqueeze(-1).repeat(1, 1, E)
+        num = keywords_masks.sum(dim=0)
+
+        clip_feat = key_clip_feat.unsqueeze(1).repeat(1, cluster_n, 1) * expand_mask
+        frame_feat = key_frame_feat.unsqueeze(1).repeat(1, cluster_n, 1) * expand_mask
+        x = (keywords_masks.sum(0) > 0.5).float().unsqueeze(-1).repeat(1, 384)
+        beta = 0.3 + (0.9 - 0.3) * (epoch / 100)
+        self.sc_feat_c = (beta * x) * self.sc_feat_c.to(device) + (1 - beta ) * clip_feat.sum(dim=0)
+        total_feat_c = clip_feat.sum(dim=0).sum(dim=0)
+        self.deviation_feat_c = self.deviation_feat_c.to(device) + total_feat_c
+
+        self.sc_feat_f = (beta * x) * self.sc_feat_f.to(device) + (1 - beta ) * frame_feat.sum(dim=0)
+        total_feat_f = frame_feat.sum(dim=0).sum(dim=0)
+        self.deviation_feat_f = self.deviation_feat_f.to(device) + total_feat_f
+
+        self.sc_feat_n = self.sc_feat_n.to(device) + num
+        self.total_feature_num = self.total_feature_num + num.sum()
+        return 0
+
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm_a = np.linalg.norm(vec1)
+    norm_b = np.linalg.norm(vec2)
+    return dot_product / (norm_a * norm_b)
+
+def map_dict(dict_, map, model):
+    temp_score = 0
+    for key in dict_:
+        if key in map:
+            dict_[key] = map[key]
+        else:
+            for word in map:
+                score = cosine_similarity(model[key], model[word])
+                if score > temp_score:
+                    temp_score = score
+                    temp_word = word
+            dict_[key] = map[temp_word]
+            temp_score = 0
+    return dict_
+
+
+def hf_list_construct(hf_dict):
+    words_list = dict()
+    for i, key in enumerate(hf_dict):
+        words_list[key] = i
+    return words_list
+
+def hf_keywords_dict_construct(keywords_dict, frequency):
+    delete = []
+    for key in keywords_dict:
+        if keywords_dict[key] < frequency:
+            delete.append(key)
+    for key in delete:
+        if key in keywords_dict:
+            del keywords_dict[key]
+    return keywords_dict
+
+def words_dict_construct(words_root):
+    words_dict = dict()
+    with open(words_root, 'r') as file:
+        text = []
+        for line in file.readlines():
+            line = line.split('#enc#', 1)[1][1:].strip()
+            text.append(line)
+
+    for line in text:
+        sentence = pattern.sub('', line.lower())
+
+        for lange in sentence.split():
+            if lange not in words_dict.keys():
+                words_dict[lange] = 1
+            else:
+                words_dict[lange] += 1
+    return words_dict
+
+# def words_dict_construct(words_root):  # json版本
+#     words_dict = dict()
+#     with open(words_root, 'r') as file:
+#         text = []
+#         for line in file.readlines():
+#             json_data = json.loads(line)
+#             text.append(json_data)
+#
+#     for line in text:
+#         sentence = pattern.sub('', line["desc"].lower())
+#
+#         for lange in sentence.split():
+#             if lange not in words_dict.keys():
+#                 words_dict[lange] = 1
+#             else:
+#                 words_dict[lange] += 1
+#     return words_dict
+
+def keywords_dict_construct( words_root, model):
+    keywords_dict = words_dict_construct(words_root)
+    delete = []
+    for key in keywords_dict:
+        for token in nlp(key):
+            if not ((token.pos_ == "NOUN") or (token.pos_ == "VERB") or (token.pos_ == "PROPN")):
+                delete.append(key)
+            elif key not in model:
+                delete.append(key)
+    for key in delete:
+        if key in keywords_dict:
+            del keywords_dict[key]
+    return keywords_dict
+
+
+def load_glove_model(glove_file, saved_model_file=None):
+    if saved_model_file and os.path.exists(saved_model_file):
+        print("Loading saved GloVe model...")
+        with open(saved_model_file, 'rb') as f:
+            model = pickle.load(f)
+        print("Done. Loaded from saved file.")
+    else:
+        print("Loading GloVe model from file...")
+        model = {}
+        with open(glove_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    split_line = line.split()
+                    word = split_line[0]
+                    embedding = np.array([float(val) for val in split_line[1:]])
+                    model[word] = embedding
+                except ValueError as e:
+                    print(f"警告：无法加载单词 '{word}' 的嵌入向量，因为 {e}. 跳过该行。")
+        print(f"Done. {len(model)} words loaded!")
+        if saved_model_file:
+            print("Saving GloVe model to file...")
+            with open(saved_model_file, 'wb') as f:
+                pickle.dump(model, f)
+            print("Done. Model saved.")
+    return model
+
+def proportion(root, keyword_dict):
+    count = 0
+    none = 0
+    yes = 0
+    with open(root, 'r') as file:
+        text = []
+        for line in file.readlines():
+            dic = json.loads(line)
+            text.append(dic)
+
+    for key in text:
+        count += 1
+        text = pattern.sub('', key["desc"].lower())
+        for lange in text.split():
+            if lange not in keyword_dict:
+                none += 1
+            else:
+                yes += 1
+                break
+    return yes/count
+
+def keywords_cluster(keywords_dict, model, n_c):
+    # 获取键列表
+    key_list = [word for word in keywords_dict]
+    # 获取值列表
+    value_list = [model[key] for key in key_list]
+
+    # 标准化
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(value_list)
+    # KMeans
+    kmeans = KMeans(n_clusters=n_c, random_state=42)
+    clusters = kmeans.fit_predict(X_scaled)
+    clusters_ = clusters.tolist()
+    # 将聚类结果添加回数据
+    for i, sample_id in enumerate(key_list):
+        keywords_dict[sample_id] = clusters_[i]
+
+    # 打印结果
+    p_list = []
+    for i in range(n_c):
+        for word in keywords_dict:
+            if keywords_dict[word] == i:
+                p_list.append(word)
+        print(f"cluster{i}: {p_list}")
+        p_list = []
+
+    # pca = PCA(n_components=2)
+    # X_pca = pca.fit_transform(X_scaled)
+    #
+    # plt.figure(figsize=(32, 24))
+    # # 使用不同的颜色表示不同的聚类
+    # for cluster in np.unique(clusters):
+    #     plt.scatter(X_pca[clusters == cluster, 0], X_pca[clusters == cluster, 1], label=f'Cluster {cluster}')
+    #
+    # # 绘制聚类中心
+    # centers = kmeans.cluster_centers_
+    # plt.scatter(centers[:, 0], centers[:, 1], c='red', s=100, alpha=0.75, marker='X', label='Centroids')
+    #
+    # plt.title('K-Means Clustering Results')
+    # plt.xlabel('Feature 1 (Standardized)')
+    # plt.ylabel('Feature 2 (Standardized)')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.savefig('/mnt/sda/zhaojialong/GMMFormer_v2-main/src/HF_lexicon/data/charades/kmeans_clustering_results.png', dpi=300, bbox_inches='tight')
+    return keywords_dict
+
+def cluster_map(keywords, v_keywords, glove_model):
+    for word in v_keywords:
+        if word in keywords:
+            v_keywords[word] = keywords[word]
+        else:
+            temp_score = 0
+            for keyword in keywords:
+                score = cosine_similarity(glove_model[keyword], glove_model[word])
+                if score > temp_score:
+                    temp_score = score
+                    temp_word = keyword
+            v_keywords[word] = keywords[temp_word]
+    return v_keywords
+
+if __name__ == "__main__":
+    glove_root = "/mnt/sda/dataset/glove/glove.840B.300d.txt"
+    glove_model_root = "/mnt/sda/dataset/glove/glove.840B.300d_model.pkl"
+    # activitynet charades
+    # train_root = "/mnt/sda/zhaojialong/FAWL-main/data/charades/TextData/prvr_vcmr_train_comp.jsonl"
+    # val_root = "/mnt/sda/zhaojialong/FAWL-main/data/charades/TextData/prvr_vcmr_val_comp.jsonl"
+    # train_root = "/mnt/sda/dataset/GMMFormer/netdisk/activitynet/TextData/activitynettrain.caption.txt"
+    # val_root = "/mnt/sda/dataset/GMMFormer/netdisk/activitynet/TextData/activitynetval.caption.txt"
+    train_root = "/mnt/sda/dataset/GMMFormer/netdisk/activitynet/TextData/activitynettrain.caption.txt"
+    val_root = "/mnt/sda/dataset/GMMFormer/netdisk/activitynet/TextData/activitynetval.caption.txt"
+    cluster_num = 200  # cha 50
+
+    # stage1 : 关键字提取，动词，名词提取    字典格式 [单词：出现次数]
+    glove_model = load_glove_model(glove_root, glove_model_root)
+    keywords = keywords_dict_construct(train_root, glove_model)  # 训练集  动词，名词字典
+    v_keywords = keywords_dict_construct(val_root, glove_model)  # 评估集  动词， 名词字典
+
+    # stage2 : 使用glove进行关键字聚类
+    keywords = keywords_cluster(keywords, glove_model, cluster_num)
+    v_keywords = cluster_map(keywords, v_keywords, glove_model)
+    data = {"keywords": keywords, "v_keywords": v_keywords, "cluster_num": cluster_num}
+    with open('/mnt/sda/zhaojialong/GMMFormer_v2-main/src/HF_lexicon/data/activitynet/keywords_data.json', 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
+    # hf_keywords = hf_keywords_dict_construct(copy.deepcopy(keywords), frequency=120)
+    # hf_keywords_map = hf_list_construct(hf_keywords)
+    # keywords = map_dict(keywords, hf_keywords_map, glove_model)
+    # v_keywords = map_dict(v_keywords, hf_keywords_map, glove_model)
+    # for key in hf_keywords:
+    #     hf_keywords[key] = 0
+    # data={
+    #     "keywords": keywords,
+    #     "hf_keywords": hf_keywords,
+    #     "v_keywords": v_keywords,
+    #     "hf_keywords_map": hf_keywords_map,
+    #     "hf_keywords_num": len(hf_keywords),
+    # }
+    #
+    # with open('data/activitynet/data.json', 'w', encoding='utf-8') as f:
+    #     json.dump(data, f, indent=4)  # indent=4 使得输出的JSON文件更易读
