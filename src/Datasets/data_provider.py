@@ -177,7 +177,7 @@ class Dataset4PRVR(data.Dataset):
     Load captions and video frame features by pre-trained CNN model.
     """
 
-    def __init__(self, cap_file, visual_feat, text_feat_path, keywords_dict, cfg, video2frames=None):
+    def __init__(self, cap_file, visual_feat, text_feat_path, sval, cfg, video2frames=None):
         # Captions
         self.captions = {}
         self.sc_mask_t = {}
@@ -194,7 +194,7 @@ class Dataset4PRVR(data.Dataset):
                 cap_id, caption = line.strip().split(' ', 1)
                 video_id = getVideoId(cap_id)
                 self.captions[cap_id] = caption
-                self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = keywords_dict.sc_feat_generate(caption, "train")
+                self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = sval.sc_feat_generate(caption, "train")
                 self.cap_ids.append(cap_id)
                 if video_id not in self.video_ids:
                     self.video_ids.append(video_id)
@@ -297,7 +297,7 @@ class TxtDataSet4PRVR(data.Dataset):
     Load captions
     """
 
-    def __init__(self, cap_file, text_feat_path, keywords_dict, cfg):
+    def __init__(self, cap_file, text_feat_path, sval, cfg):
         # Captions
         self.captions = {}
         self.cap_ids = []
@@ -307,7 +307,7 @@ class TxtDataSet4PRVR(data.Dataset):
             for line in cap_reader.readlines():
                 cap_id, caption = line.strip().split(' ', 1)
                 self.captions[cap_id] = caption
-                self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = keywords_dict.sc_feat_generate(caption, "val")
+                self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = sval.sc_feat_generate(caption, "val")
                 self.cap_ids.append(cap_id)
         self.text_feat_path = text_feat_path
         self.max_desc_len = cfg['max_desc_l']
