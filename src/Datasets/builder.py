@@ -6,7 +6,7 @@ from Utils.basic_utils import BigFile, read_dict
 from Datasets.data_provider import Dataset4PRVR, VisDataSet4PRVR, TxtDataSet4PRVR, \
                     collate_train, collate_frame_val, collate_text_val, read_video_ids
 
-def get_datasets(cfg, keywords_dict):
+def get_datasets(cfg, sval):
 
     rootpath = cfg['data_root']
     collection = cfg['collection']
@@ -43,12 +43,12 @@ def get_datasets(cfg, keywords_dict):
 
     video2frames = read_dict(os.path.join(rootpath, collection, 'FeatureData', cfg['visual_feature'], 'video2frames.txt'))
     if use_clip_feature:
-        train_dataset = Dataset4PRVR(caption_files['train'], visual_feats_train, text_feat_train_path, keywords_dict, cfg)
+        train_dataset = Dataset4PRVR(caption_files['train'], visual_feats_train, text_feat_train_path, sval, cfg)
     else:
-        train_dataset = Dataset4PRVR(caption_files['train'], visual_feats, text_feat_train_path, keywords_dict, cfg,
+        train_dataset = Dataset4PRVR(caption_files['train'], visual_feats, text_feat_train_path, sval, cfg,
                                      video2frames=video2frames)
 
-    val_text_dataset = TxtDataSet4PRVR(caption_files['val'], text_feat_val_path, keywords_dict, cfg)
+    val_text_dataset = TxtDataSet4PRVR(caption_files['val'], text_feat_val_path, sval, cfg)
     val_video_ids_list = read_video_ids(caption_files['val'])
     if use_clip_feature:
         val_video_dataset = VisDataSet4PRVR(visual_feats_val, video2frames, cfg, video_ids=val_video_ids_list)
