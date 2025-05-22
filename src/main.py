@@ -20,7 +20,7 @@ from Validations.builder import get_validations
 
 from Utils.basic_utils import AverageMeter
 from Utils.utils import set_seed, set_log, gpu, save_ckpt, load_ckpt
-from HF_lexicon.high_frequency_lexicon import HF_Words_Thesaurus
+from Sval.sval import svalc
 
 
 root_path = os.path.dirname(os.path.abspath(__file__))
@@ -131,8 +131,8 @@ def main(logger):
 
     # dataset
     logger.info('Loading Data ......')
-    keywords_dict = HF_Words_Thesaurus(cfg)
-    cfg, train_loader, context_dataloader, query_eval_loader = get_datasets(cfg, keywords_dict)
+    sval = svalc(cfg)
+    cfg, train_loader, context_dataloader, query_eval_loader = get_datasets(cfg, sval)
 
     # model
     logger.info('Loading Model ......') 
@@ -166,12 +166,12 @@ def main(logger):
     for epoch in range(current_epoch + 1, cfg['n_epoch']):
 
         ############## train
-        loss_meter = train_one_epoch(epoch, train_loader, model, criterion, cfg, optimizer, keywords_dict)
+        loss_meter = train_one_epoch(epoch, train_loader, model, criterion, cfg, optimizer, sval)
 
         ############## val
         with torch.no_grad():
             val_meter, best_val, es = val_one_epoch(epoch, context_dataloader, query_eval_loader, model, 
-                    val_criterion, cfg, optimizer, best_val, loss_meter, logger, keywords_dict)
+                    val_criterion, cfg, optimizer, best_val, loss_meter, logger, sval)
 
         ############## early stop
         if not es:
