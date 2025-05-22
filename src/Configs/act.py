@@ -10,7 +10,7 @@ cfg['collection_val'] = 'activitynet'
 cfg['seed'] = 9527
 # cfg['root'] =
 # cfg['data_root'] =
-# cfg['HF_lexicon_root'] =
+# cfg['sval_root'] =
 
 cfg['visual_feature'] = 'i3d'
 cfg['map_size'] = 32
