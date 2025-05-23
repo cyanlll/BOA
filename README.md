@@ -1,4 +1,4 @@
-### BOA
+# BOA
 ## Training on ActivityNet Captions
 
 ```bash
