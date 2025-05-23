@@ -3,3 +3,4 @@ BOA
 
 ```bash
 cd src
+python main.py -d charades --gpu 0
