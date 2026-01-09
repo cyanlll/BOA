@@ -9,18 +9,18 @@ cfg['model_name'] = 'boa'
 cfg['collection'] = cfg['dataset_name'] = 'tvr'
 cfg['collection_val'] = 'tvr'
 cfg['seed'] = 9527
-cfg['root'] = '/mnt/sda/zhaojialong/GMMFormer_v2-main/src/Save/tmp'
+cfg['root'] = '../src/Save/tmp'
 
 if cfg['use_clip_feat']:
-    cfg['data_root'] = '/mnt/sda/dataset/GMMFormer/netdisk/clip'
+    cfg['data_root'] = '../netdisk/clip'
     cfg["text_feat_dim"] = 512
     cfg["visual_feat_dim"] = 512
 else:
-    cfg['data_root'] = '/mnt/sda/dataset/GMMFormer/netdisk'
+    cfg['data_root'] = '../netdisk'
     cfg["text_feat_dim"] = 768
 
 
-cfg['sval_root'] = '/mnt/sda/zhaojialong/GMMFormer_v2-main/src/Sval/data'
+cfg['sval_root'] = '../src/Sval/data'
 
 cfg['visual_feature'] = 'i3d_resnet'
 cfg['map_size'] = 32
@@ -29,7 +29,6 @@ cfg['frame_scale_w'] = 0.5
 
 cfg['model_root'] = os.path.join(cfg['root'], 'results', cfg['dataset_name'], cfg['model_name'])
 cfg['ckpt_path'] = os.path.join(cfg['model_root'], 'ckpt')
-# cfg['visual_feat_dim'] = 512
 
 # extra
 cfg['sft_factor'] = 0.6
@@ -57,11 +56,6 @@ cfg['hard_pool_size'] = 20
 cfg['use_hard_negative'] = False
 cfg['loss_factor'] = [0.02, 0.04, 0.00025, 0.09]
 cfg['neg_factor'] = [0.2, 32, 1]
-# 2025-08-12 09:18:15,937 - INFO - Average Loss: 1.3747     8e-5
-# 2025-08-12 09:18:15,938 - INFO - Best: R@1: 0.5 R@5: 2.7 R@10: 5.1 R@100: 32.4 Rsum: 40.6
-# 2025-06-25 03:18:51,906 - INFO - Average Loss: 1.3424
-# 2025-06-25 03:18:51,906 - INFO - Best: R@1: 0.7 R@5: 2.7 R@10: 4.9 R@100: 31.3 Rsum: 39.7
-# Best: R@1: 0.7 R@5: 2.6 R@10: 4.7 R@100: 32.2 Rsum: 40.2
 
 # eval
 cfg['eval_query_bsz'] = 50
