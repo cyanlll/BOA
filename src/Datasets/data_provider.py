@@ -6,6 +6,7 @@ import re
 import h5py
 import os
 import pickle
+import random
 
 
 def getVideoId(cap_id):
@@ -64,7 +65,6 @@ def uniform_feature_sampling(features, max_len):
             new_features.append(features[s_idx])
     new_features = np.asarray(new_features)
     return new_features
-
 
 def l2_normalize_np_array(np_array, eps=1e-5):
     """np_array: np.ndarray, (*, D), where the last dim will be normalized"""
@@ -182,8 +182,6 @@ class Dataset4PRVR(data.Dataset):
         self.captions = {}
         self.sc_mask_t = {}
         self.sc_mask_v = {}
-        # self.sc_feat_c = keywords_dict.sc_feat_c
-        # self.keywords = keywords_dict.keywords
         self.cap_ids = []
         self.video_ids = []
         self.vid_caps = {}
@@ -191,18 +189,18 @@ class Dataset4PRVR(data.Dataset):
 
         with open(cap_file, 'r') as cap_reader:
             for line in cap_reader.readlines():
-                cap_id, caption = line.strip().split(' ', 1)
-                video_id = getVideoId(cap_id)
-                self.captions[cap_id] = caption
-                self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = sval.sc_feat_generate(caption, "train")
-                self.cap_ids.append(cap_id)
-                if video_id not in self.video_ids:
-                    self.video_ids.append(video_id)
-                if video_id in self.vid_caps:
-                    self.vid_caps[video_id].append(cap_id)
-                else:
-                    self.vid_caps[video_id] = []
-                    self.vid_caps[video_id].append(cap_id)
+                    cap_id, caption = line.strip().split(' ', 1)
+                    video_id = getVideoId(cap_id)
+                    self.captions[cap_id] = caption
+                    self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = sval.sc_feat_generate(caption, "train")
+                    self.cap_ids.append(cap_id)
+                    if video_id not in self.video_ids:
+                        self.video_ids.append(video_id)
+                    if video_id in self.vid_caps:
+                        self.vid_caps[video_id].append(cap_id)
+                    else:
+                        self.vid_caps[video_id] = []
+                        self.vid_caps[video_id].append(cap_id)
         self.visual_feat = visual_feat
         self.text_feat_path = text_feat_path
 
@@ -212,7 +210,6 @@ class Dataset4PRVR(data.Dataset):
 
         self.open_file = False
         self.length = len(self.vid_caps)
-
 
     def __getitem__(self, index):
 
@@ -224,14 +221,10 @@ class Dataset4PRVR(data.Dataset):
             self.open_file = True
         video_id = self.video_ids[index]
         cap_ids = self.vid_caps[video_id]
-
-        # video
         frame_list = self.video2frames[video_id]
-
         frame_vecs = []
         for frame_id in frame_list:
             frame_vecs.append(self.visual_feat.read_one(frame_id))
-
         clip_video_feature = average_to_fixed_length(np.array(frame_vecs), self.map_size)
         clip_video_feature = l2_normalize_np_array(clip_video_feature)
         clip_video_feature = torch.from_numpy(clip_video_feature).unsqueeze(0)
@@ -239,17 +232,12 @@ class Dataset4PRVR(data.Dataset):
         frame_video_feature = average_to_fixed_length(np.array(frame_vecs), self.max_ctx_len)
         frame_video_feature = l2_normalize_np_array(frame_video_feature)
         frame_video_feature = torch.from_numpy(frame_video_feature)
-
-        # text
         cap_tensors = []
-        # sc_feat = []
         sc_mask_t = []
         sc_mask_v = []
         for cap_id in cap_ids:
-
             cap_feat = self.text_feat[cap_id][...]
             cap_tensor = torch.from_numpy(l2_normalize_np_array(cap_feat))[:self.max_desc_len]
-
             cap_tensors.append(cap_tensor)
             sc_mask_t.append(self.sc_mask_t[cap_id])
             sc_mask_v.append(self.sc_mask_v[cap_id])
@@ -272,6 +260,7 @@ class VisDataSet4PRVR(data.Dataset):
         self.length = len(self.video_ids)
         self.map_size = cfg['map_size']
         self.max_ctx_len = cfg['max_ctx_l']
+
     def __getitem__(self, index):
         video_id = self.video_ids[index]
         frame_list = self.video2frames[video_id]
@@ -323,9 +312,7 @@ class TxtDataSet4PRVR(data.Dataset):
 
             self.open_file = True
 
-        sc_feat = []
         cap_feat = self.text_feat[cap_id][...]
-        caption = self.captions[cap_id]
         cap_tensor = torch.from_numpy(l2_normalize_np_array(cap_feat))[:self.max_desc_len]
         sc_mask_t = self.sc_mask_t[cap_id]
         sc_mask_v = self.sc_mask_v[cap_id]
@@ -336,7 +323,136 @@ class TxtDataSet4PRVR(data.Dataset):
         return self.length
 
 
+class Dataset4PRVR_c(data.Dataset):
+    """
+    Load captions and video frame features by pre-trained CNN model.
+    """
+
+    def __init__(self, cap_file, visual_feat, text_feat_path, sval, cfg, video2frames=None):
+        # Captions
+        self.captions = {}
+        self.sc_mask_t = {}
+        self.sc_mask_v = {}
+        self.cap_ids = []
+        self.video_ids = []
+        self.vid_caps = {}
+        self.video2frames = video2frames
+
+        with open(cap_file, 'r') as cap_reader:
+            for line in cap_reader.readlines():
+                    cap_id, caption = line.strip().split(' ', 1)
+                    video_id = getVideoId(cap_id)
+                    self.captions[cap_id] = caption
+                    self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = sval.sc_feat_generate(caption, "train")
+                    self.cap_ids.append(cap_id)
+                    if video_id not in self.video_ids:
+                        self.video_ids.append(video_id)
+                    if video_id in self.vid_caps:
+                        self.vid_caps[video_id].append(cap_id)
+                    else:
+                        self.vid_caps[video_id] = []
+                        self.vid_caps[video_id].append(cap_id)
+        self.text_feat_path = text_feat_path
+        self.map_size = cfg['map_size']
+        self.max_ctx_len = cfg['max_ctx_l']
+        self.max_desc_len = cfg['max_desc_l']
+        self.open_file = False
+        self.length = len(self.vid_caps)
+        self.clip_vid_feat = h5py.File(visual_feat, 'r')
+
+    def __getitem__(self, index):
+
+        if self.open_file:
+            self.open_file = True
+        else:
+            self.text_feat = h5py.File(self.text_feat_path, 'r')
+
+            self.open_file = True
+        video_id = self.video_ids[index]
+        cap_ids = self.vid_caps[video_id]
+        clip_video_feature = average_to_fixed_length(np.array(self.clip_vid_feat[video_id]), self.map_size)
+        clip_video_feature = l2_normalize_np_array(clip_video_feature)
+        clip_video_feature = torch.from_numpy(clip_video_feature).unsqueeze(0)
+        frame_video_feature = average_to_fixed_length(np.array(self.clip_vid_feat[video_id]), self.max_ctx_len)
+        frame_video_feature = l2_normalize_np_array(frame_video_feature)
+        frame_video_feature = torch.from_numpy(frame_video_feature)
+        cap_tensors = []
+        sc_mask_t = []
+        sc_mask_v = []
+        for cap_id in cap_ids:
+            cap_feat = self.text_feat[cap_id][...]
+            cap_tensor = torch.from_numpy(l2_normalize_np_array(cap_feat))[0]
+            cap_tensor = cap_tensor[:self.max_desc_len]
+            cap_tensors.append(cap_tensor)
+            sc_mask_t.append(self.sc_mask_t[cap_id])
+            sc_mask_v.append(self.sc_mask_v[cap_id])
+
+        return clip_video_feature, frame_video_feature, cap_tensors, index, cap_ids, video_id, sc_mask_t, sc_mask_v
+
+    def __len__(self):
+        return self.length
+
+
+class VisDataSet4PRVR_c(data.Dataset):
+
+    def __init__(self, visual_feat, cfg, video_ids=None):
+        self.visual_feat = h5py.File(visual_feat, 'r')
+        self.video_ids = video_ids
+        self.length = len(self.video_ids)
+        self.map_size = cfg['map_size']
+        self.max_ctx_len = cfg['max_ctx_l']
+
+    def __getitem__(self, index):
+        video_id = self.video_ids[index]
+        clip_video_feature = average_to_fixed_length(np.array(self.visual_feat[video_id]), self.map_size)
+        clip_video_feature = l2_normalize_np_array(clip_video_feature)
+        clip_video_feature = torch.from_numpy(clip_video_feature).unsqueeze(0)
+        frame_video_feature = average_to_fixed_length(np.array(self.visual_feat[video_id]), self.max_ctx_len)
+        frame_video_feature = l2_normalize_np_array(frame_video_feature)
+        frame_video_feature = torch.from_numpy(frame_video_feature)
+        return clip_video_feature, frame_video_feature, index, video_id
+
+    def __len__(self):
+        return self.length
+
+
+class TxtDataSet4PRVR_c(data.Dataset):
+    def __init__(self, cap_file, text_feat_path, sval, cfg):
+        # Captions
+        self.captions = {}
+        self.cap_ids = []
+        self.sc_mask_t = {}
+        self.sc_mask_v = {}
+        with open(cap_file, 'r') as cap_reader:
+            for line in cap_reader.readlines():
+                cap_id, caption = line.strip().split(' ', 1)
+                self.captions[cap_id] = caption
+                self.sc_mask_t[cap_id], self.sc_mask_v[cap_id] = sval.sc_feat_generate(caption, "val")
+                self.cap_ids.append(cap_id)
+        self.text_feat_path = text_feat_path
+        self.max_desc_len = cfg['max_desc_l']
+        self.open_file = False
+        self.length = len(self.cap_ids)
+
+    def __getitem__(self, index):
+        cap_id = self.cap_ids[index]
+        if self.open_file:
+            self.open_file = True
+        else:
+            self.text_feat = h5py.File(self.text_feat_path, 'r')
+
+            self.open_file = True
+        cap_feat = self.text_feat[cap_id][...]
+        cap_tensor = torch.from_numpy(l2_normalize_np_array(cap_feat))[0]
+        cap_tensor = cap_tensor[:self.max_desc_len]
+        sc_mask_t = self.sc_mask_t[cap_id]
+        sc_mask_v = self.sc_mask_v[cap_id]
+        return cap_tensor, index, cap_id, sc_mask_t, sc_mask_v
+
+    def __len__(self):
+        return self.length
+
+
 if __name__ == '__main__':
+
     pass
-
-
