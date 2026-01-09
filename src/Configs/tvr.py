@@ -1,0 +1,98 @@
+import os
+import yaml
+
+
+cfg = {}
+cfg['use_clip_feat'] = None
+
+cfg['model_name'] = 'boa'
+cfg['collection'] = cfg['dataset_name'] = 'tvr'
+cfg['collection_val'] = 'tvr'
+cfg['seed'] = 9527
+cfg['root'] = '/mnt/sda/zhaojialong/GMMFormer_v2-main/src/Save/tmp'
+
+if cfg['use_clip_feat']:
+    cfg['data_root'] = '/mnt/sda/dataset/GMMFormer/netdisk/clip'
+    cfg["text_feat_dim"] = 512
+    cfg["visual_feat_dim"] = 512
+else:
+    cfg['data_root'] = '/mnt/sda/dataset/GMMFormer/netdisk'
+    cfg["text_feat_dim"] = 768
+
+
+cfg['sval_root'] = '/mnt/sda/zhaojialong/GMMFormer_v2-main/src/Sval/data'
+
+cfg['visual_feature'] = 'i3d_resnet'
+cfg['map_size'] = 32
+cfg['clip_scale_w'] = 0.5
+cfg['frame_scale_w'] = 0.5
+
+cfg['model_root'] = os.path.join(cfg['root'], 'results', cfg['dataset_name'], cfg['model_name'])
+cfg['ckpt_path'] = os.path.join(cfg['model_root'], 'ckpt')
+# cfg['visual_feat_dim'] = 512
+
+# extra
+cfg['sft_factor'] = 0.6
+
+
+# dataset
+cfg['num_workers'] = 32
+cfg['no_core_driver'] = False
+cfg['no_pin_memory'] = False
+cfg['batchsize'] = 128
+
+
+# opt
+cfg['lr'] = 0.00025
+cfg['lr_warmup_proportion'] = 0.01  # 1/150
+cfg['wd'] = 0.01
+cfg['margin'] = 0.2
+
+
+# train
+cfg['n_epoch'] = 100
+cfg['max_es_cnt'] = 20
+cfg['hard_negative_start_epoch'] = 20
+cfg['hard_pool_size'] = 20
+cfg['use_hard_negative'] = False
+cfg['loss_factor'] = [0.02, 0.04, 0.00025, 0.09]
+cfg['neg_factor'] = [0.2, 32, 1]
+# 2025-08-12 09:18:15,937 - INFO - Average Loss: 1.3747     8e-5
+# 2025-08-12 09:18:15,938 - INFO - Best: R@1: 0.5 R@5: 2.7 R@10: 5.1 R@100: 32.4 Rsum: 40.6
+# 2025-06-25 03:18:51,906 - INFO - Average Loss: 1.3424
+# 2025-06-25 03:18:51,906 - INFO - Best: R@1: 0.7 R@5: 2.7 R@10: 4.9 R@100: 31.3 Rsum: 39.7
+# Best: R@1: 0.7 R@5: 2.6 R@10: 4.7 R@100: 32.2 Rsum: 40.2
+
+# eval
+cfg['eval_query_bsz'] = 50
+cfg['eval_context_bsz'] = 100
+
+
+# model
+cfg['max_desc_l'] = 60
+cfg['max_ctx_l'] = 128
+cfg['sub_feat_size'] = 768
+cfg['q_feat_size'] = 384
+cfg['max_position_embeddings'] = 300
+cfg['hidden_size'] = 384
+cfg['n_heads'] = 4
+cfg['input_drop'] = 0.2
+cfg['drop'] = 0.2
+cfg['initializer_range'] = 0.01
+cfg['top_k'] = 5
+
+
+cfg['num_workers'] = 1 if cfg['no_core_driver'] else cfg['num_workers']
+cfg['pin_memory'] = not cfg['no_pin_memory']
+
+
+if not os.path.exists(cfg['model_root']):
+    os.makedirs(cfg['model_root'], exist_ok=True)
+if not os.path.exists(cfg['ckpt_path']):
+    os.makedirs(cfg['ckpt_path'], exist_ok=True)
+
+
+def get_cfg_defaults():
+    with open(os.path.join(cfg['model_root'], 'hyperparams.yaml'), 'w') as yaml_file:
+        yaml.dump(cfg, yaml_file)
+    return cfg
