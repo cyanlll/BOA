@@ -27,4 +27,5 @@ python main.py -d cha --gpu 0
 cd src
 python main.py -d tvr --gpu 0
 ```
-You can download the trained model checkpoint from [Baidu Netdisk](https://)
+You can download the trained model checkpoint from [Baidu Netdisk](https://https://pan.baidu.com/s/1CAv1dCHn1Pv9LCelChv_hg?pwd=g5w4)
+)
