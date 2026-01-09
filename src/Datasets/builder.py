@@ -4,7 +4,8 @@ from torch.utils.data import DataLoader
 
 from Utils.basic_utils import BigFile, read_dict
 from Datasets.data_provider import Dataset4PRVR, VisDataSet4PRVR, TxtDataSet4PRVR, \
-                    collate_train, collate_frame_val, collate_text_val, read_video_ids
+                    collate_train, collate_frame_val, collate_text_val, read_video_ids, \
+                    Dataset4PRVR_c, VisDataSet4PRVR_c, TxtDataSet4PRVR_c
 
 def get_datasets(cfg, sval):
 
@@ -37,21 +38,29 @@ def get_datasets(cfg, sval):
     caption_files['val'] = os.path.join(rootpath, collection_val, 'TextData', cap_file['val'])
 
     # Load visual features
-    visual_feats_train = visual_feats_val = os.path.join(rootpath, collection, 'FeatureData', cfg['visual_feature'])
-    visual_feats = BigFile(visual_feats_train)
-    cfg['visual_feat_dim'] = visual_feats.ndims
+    if use_clip_feature:
+        visual_feats_train = os.path.join(rootpath, collection, 'FeatureData',
+                                          'new_clip_vit_32_%s_train_vid_features.hdf5' % collection)
+        visual_feats_val = os.path.join(rootpath, collection_val, 'FeatureData',
+                                        'new_clip_vit_32_%s_val_vid_features.hdf5' % collection_val)
+    else:
+        visual_feats_train = visual_feats_val = os.path.join(rootpath, collection, 'FeatureData', cfg['visual_feature'])
+        visual_feats = BigFile(visual_feats_train)
+        cfg['visual_feat_dim'] = visual_feats.ndims
 
     video2frames = read_dict(os.path.join(rootpath, collection, 'FeatureData', cfg['visual_feature'], 'video2frames.txt'))
     if use_clip_feature:
-        train_dataset = Dataset4PRVR(caption_files['train'], visual_feats_train, text_feat_train_path, sval, cfg)
+        train_dataset = Dataset4PRVR_c(caption_files['train'], visual_feats_train, text_feat_train_path, sval, cfg)
+        val_text_dataset = TxtDataSet4PRVR_c(caption_files['val'], text_feat_val_path, sval, cfg)
     else:
         train_dataset = Dataset4PRVR(caption_files['train'], visual_feats, text_feat_train_path, sval, cfg,
                                      video2frames=video2frames)
+        val_text_dataset = TxtDataSet4PRVR(caption_files['val'], text_feat_val_path, sval, cfg)
 
-    val_text_dataset = TxtDataSet4PRVR(caption_files['val'], text_feat_val_path, sval, cfg)
     val_video_ids_list = read_video_ids(caption_files['val'])
     if use_clip_feature:
-        val_video_dataset = VisDataSet4PRVR(visual_feats_val, video2frames, cfg, video_ids=val_video_ids_list)
+        # val_video_dataset = VisDataSet4PRVR(visual_feats_val, video2frames, cfg, video_ids=val_video_ids_list)
+        val_video_dataset = VisDataSet4PRVR_c(visual_feats_val, cfg, video_ids=val_video_ids_list)
     else:
         val_video_dataset = VisDataSet4PRVR(visual_feats, video2frames, cfg, video_ids=val_video_ids_list)
 
