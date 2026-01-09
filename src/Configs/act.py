@@ -61,7 +61,7 @@ cfg['eval_query_bsz'] = 50
 cfg['eval_context_bsz'] = 100
 
 # model
-cfg['max_desc_l'] = 30
+cfg['max_desc_l'] = 60
 cfg['max_ctx_l'] = 128
 cfg['q_feat_size'] = 384
 cfg['max_position_embeddings'] = 300
