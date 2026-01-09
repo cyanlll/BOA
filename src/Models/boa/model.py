@@ -108,11 +108,6 @@ class BOA_Net(nn.Module):
                       repeat(1, deviation_feat_f.shape[0]) - deviation_feat_f.unsqueeze(0).
                       repeat(sval.cluster_number, 1)).to(device)
 
-        # sc_feat_c_ = (sval.sc_feat_c / sval.sc_feat_n.unsqueeze(-1).
-        #               repeat(1, deviation_feat_c.shape[0])).to(device)
-        # sc_feat_f_ = (sval.sc_feat_f / sval.sc_feat_n.unsqueeze(-1).
-        #               repeat(1, deviation_feat_f.shape[0])).to(device)
-
         encoded_frame_feat, vid_proposal_feat = self.encode_context(
             clip_video_feat, frame_video_feat, frame_video_mask, (sc_feat_c_, sc_feat_f_))
 
@@ -158,12 +153,6 @@ class BOA_Net(nn.Module):
         video_query_f = self.get_modularized_queries(encoded_query_f, query_mask)  # (N, D) * 1
 
         return (video_query_c, video_query_f), query_feat
-        # return (video_query_c, video_query_c), query_feat
-
-    # X = sc_feat_c.shape[0]
-    # shuffle_indices = torch.randperm(X)
-    # sc_feat_c = sc_feat_c[shuffle_indices]
-    # sc_feat_f = sc_feat_f[shuffle_indices]
 
     def encode_context(self, clip_video_feat, frame_video_feat, video_mask=None, sc_feats=None):
 
@@ -189,7 +178,6 @@ class BOA_Net(nn.Module):
         weight_c = F.softmax(weight_c.permute(0, 2, 1) / self.sft_factor, dim=-1)
         out_c = torch.sum(encoded_clip_feat * weight_c.unsqueeze(2).
                           repeat(1, 1, encoded_clip_feat.shape[2], 1), dim=-1)
-        # out_c = torch.mean(encoded_clip_feat, dim=-1)
 
         weight_token_f = video_feat[1].unsqueeze(1)
         weight_f = []
@@ -200,11 +188,8 @@ class BOA_Net(nn.Module):
         weight_f = F.softmax(weight_f.permute(0, 2, 1) / self.sft_factor, dim=-1)
         out_f = torch.sum(encoded_frame_feat * weight_f.unsqueeze(2).
                           repeat(1, 1, encoded_frame_feat.shape[2], 1), dim=-1)
-        # out_f = torch.mean(encoded_frame_feat, dim=-1)
 
         return out_f, out_c
-
-        # return frame_video_feat, clip_video_feat
 
     def feat_retrieval(self, clip_key_features, frame_key_features, sc_feats):
         device = clip_key_features.device
