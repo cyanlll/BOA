@@ -5,27 +5,27 @@ import torch.nn.functional as F
 import numpy as np
 from Models.boa.model_components import clip_nce, frame_nce
 
+
 class query_diverse_loss(nn.Module):
     def __init__(self, config):
         torch.nn.Module.__init__(self)
         self.mrg = config['neg_factor'][0]
         self.alpha = config['neg_factor'][1]
         self.lamda = config['neg_factor'][2]
-        
-    def forward(self, x, label_dict):
 
+    def forward(self, x, label_dict):
         bs = x.shape[0]
         x = F.normalize(x, dim=-1)
         cos = torch.matmul(x, x.t())
 
         N_one_hot = torch.zeros((bs, bs))
         for i, label in label_dict.items():
-            N_one_hot[label[0]:(label[-1]+1), label[0]:(label[-1]+1)] = torch.ones((len(label), len(label)))
+            N_one_hot[label[0]:(label[-1] + 1), label[0]:(label[-1] + 1)] = torch.ones((len(label), len(label)))
         N_one_hot = N_one_hot - torch.eye(bs)
         N_one_hot = N_one_hot.cuda()
-    
+
         neg_exp = torch.exp(self.alpha * (cos + self.mrg))
-        
+
         N_sim_sum = torch.where(N_one_hot == 1, neg_exp, torch.zeros_like(neg_exp))
         focal = torch.where(N_one_hot == 1, cos, torch.zeros_like(cos))
 
@@ -54,7 +54,7 @@ class loss(nn.Module):
         '''
 
         query_labels = batch['text_labels']
-        
+
         clip_scale_scores = input_list[0]
         clip_scale_scores_ = input_list[1]
         label_dict = input_list[2]
@@ -63,16 +63,18 @@ class loss(nn.Module):
 
         query = input_list[-1]
 
-        clip_nce_loss = self.cfg['loss_factor'][0] * self.clip_nce_criterion(query_labels, label_dict, clip_scale_scores_)
+        clip_nce_loss = self.cfg['loss_factor'][0] * self.clip_nce_criterion(query_labels, label_dict,
+                                                                             clip_scale_scores_)
         clip_trip_loss = self.get_clip_triplet_loss(clip_scale_scores, query_labels)
 
-        frame_nce_loss = self.cfg['loss_factor'][1] * self.video_nce_criterion(query_labels, label_dict, frame_scale_scores_)
+        frame_nce_loss = self.cfg['loss_factor'][1] * self.video_nce_criterion(query_labels, label_dict,
+                                                                               frame_scale_scores_)
         frame_trip_loss = self.get_clip_triplet_loss(frame_scale_scores, query_labels)
 
         qdl_loss = self.cfg['loss_factor'][2] * self.qdl(query[0], label_dict)
         qdl_loss_c = self.cfg['loss_factor'][2] * self.qdl(query[1], label_dict)
 
-        loss = clip_nce_loss + clip_trip_loss + frame_nce_loss + frame_trip_loss + qdl_loss + qdl_loss_c   #
+        loss = clip_nce_loss + clip_trip_loss + frame_nce_loss + frame_trip_loss + qdl_loss + qdl_loss_c  #
         return loss
 
     def get_clip_triplet_loss(self, query_context_scores, labels):
@@ -84,7 +86,6 @@ class loss(nn.Module):
         v2t_loss = 0
         for i in range(v2t_scores.shape[0]):
             pos_pair_scores = torch.mean(v2t_scores[i][np.where(labels == i)])
-
 
             neg_pair_scores, _ = torch.sort(v2t_scores[i][np.where(labels != i)[0]], descending=True)
             if self.cfg['use_hard_negative']:
