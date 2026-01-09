@@ -27,7 +27,6 @@ def get_gt(video_metas, query_metas):
 
 
 def eval_q2m(scores, q2m_gts):
-
     n_q, n_m = scores.shape
 
     gt_ranks = torch.zeros((n_q), dtype=torch.int32).cuda()
@@ -51,7 +50,6 @@ def eval_q2m(scores, q2m_gts):
 
 
 def cal_perf(t2v_all_errors, t2v_gt):
-
     # video retrieval
     (t2v_r1, t2v_r5, t2v_r10, t2v_r100) = eval_q2m(t2v_all_errors, t2v_gt)
 
@@ -64,7 +62,6 @@ class validations(nn.Module):
 
         self.cfg = cfg
 
-
     def forward(self, model, context_dataloader, query_eval_loader, sval, epoch):
 
         model.eval()
@@ -76,13 +73,11 @@ class validations(nn.Module):
         video_metas = context_info['video_metas']
 
         v2t_gt, t2v_gt = get_gt(video_metas, query_metas)
-
         t2v_r1, t2v_r5, t2v_r10, t2v_r100 = cal_perf(-1 * score_sum, t2v_gt)
         t2v_rsum = 0
-        t2v_rsum += (t2v_r1 + t2v_r5 + t2v_r10 )  # + t2v_r100
+        t2v_rsum += (t2v_r1 + t2v_r5 + t2v_r10 + t2v_r100)  # + t2v_r100
 
         return [t2v_r1, t2v_r5, t2v_r10, t2v_r100, t2v_rsum]
-
 
     def compute_query2ctx_info(self, model, query_eval_loader, ctx_info, sval):
 
@@ -90,7 +85,6 @@ class validations(nn.Module):
         score_sum = []
         for idx, batch in tqdm(enumerate(query_eval_loader),
                                desc="Computing q embedding", total=len(query_eval_loader)):
-
             batch = gpu(batch)
             query_metas.extend(batch[3])
             query_feat = batch[0]
@@ -109,7 +103,8 @@ class validations(nn.Module):
 
             _clip_scale_scores, _frame_scale_scores, clips, frames = model.get_pred_from_raw_query(
                 query_feat, query_mask, None, ctx_info["video_proposal_feat"], ctx_info["video_feat"],
-                ori_feat=(sc_feat_c_, sc_feat_f_), sval=sval, sc_mask=(sc_masks_t, sc_masks_v))
+                ori_feat=(sc_feat_c_, sc_feat_f_), sval=sval,
+                sc_mask=(sc_masks_t, sc_masks_v))  # query_metas=batch[3], video_metas=ctx_info["video_metas"]
             _score_sum = self.cfg['clip_scale_w'] * _clip_scale_scores + self.cfg['frame_scale_w'] * _frame_scale_scores
 
             score_sum.append(_score_sum)
@@ -123,8 +118,7 @@ class validations(nn.Module):
         vid_proposal_feat = []
         frame_feat, frame_mask = [], []
         for idx, batch in tqdm(enumerate(context_dataloader), desc="Computing query2video scores",
-                            total=len(context_dataloader)):
-
+                               total=len(context_dataloader)):
             batch = gpu(batch)
             metas.extend(batch[-1])
             clip_video_feat_ = batch[0]
@@ -164,12 +158,12 @@ class validations(nn.Module):
                 else:
                     raise ValueError("Only support 2/3 dimensional tensors")
                 for i, e in enumerate(tensor_list):
-                    res_tensor[b_sizes_cumsum[i]:b_sizes_cumsum[i+1], :seq_l[i]] = e
+                    res_tensor[b_sizes_cumsum[i]:b_sizes_cumsum[i + 1], :seq_l[i]] = e
                 return res_tensor
-                
+
         return dict(
             video_metas=metas,  # list(dict) (N_videos)
             video_proposal_feat=vid_proposal_feat,
             video_feat=cat_tensor(frame_feat),
             video_mask=cat_tensor(frame_mask)
-            )
+        )
