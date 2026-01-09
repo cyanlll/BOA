@@ -28,11 +28,11 @@ sys.path.insert(0, root_path)
 
 parser = argparse.ArgumentParser(description="Partially Relevant Video Retrieval")
 parser.add_argument(
-    '-d', '--dataset_name', default='act', type=str, metavar='DATASET', help='dataset name',
-    choices=['act', 'cha']
+    '-d', '--dataset_name', default='tvr', type=str, metavar='DATASET', help='dataset name',
+    choices=['act', 'cha', "tvr"]
 )
 parser.add_argument(
-    '--gpu', default = '0', type = str, help = 'specify gpu device'
+    '--gpu', default = '1', type = str, help = 'specify gpu device'
     )
 parser.add_argument('--eval', action='store_true')
 parser.add_argument('--resume', default='', type=str)
@@ -81,7 +81,11 @@ def val_one_epoch(epoch, context_dataloader, query_eval_loader, model, val_crite
         es = False
         sc = 'New Best Model !!!'
         best_val = val_meter
-        save_ckpt(model, optimizer, cfg, os.path.join(cfg['model_root'], 'best.ckpt'), epoch, best_val)
+
+        save_ckpt(model, optimizer, cfg, os.path.join(cfg['model_root'], f'best.ckpt'), epoch, best_val)
+            torch.save({'deviation_feat_c': keywords_dict.deviation_feat_c,
+                        'deviation_feat_f': keywords_dict.deviation_feat_f, 'sc_feat_c': keywords_dict.sc_feat_c,
+                        'sc_feat_f': keywords_dict.sc_feat_f, 'sc_feat_n': keywords_dict.sc_feat_n, 'total_feature_num': keywords_dict.total_feature_num}, f'data.pt')
     else:
         es = True
         sc = 'A Relative Failure Epoch'
@@ -92,22 +96,24 @@ def val_one_epoch(epoch, context_dataloader, query_eval_loader, model, val_crite
     logger.info('R@1: {:.1f}'.format(val_meter[0]))
     logger.info('R@5: {:.1f}'.format(val_meter[1]))
     logger.info('R@10: {:.1f}'.format(val_meter[2]))
+    logger.info('R@100: {:.1f}'.format(val_meter[3]))
     logger.info('Rsum: {:.1f}'.format(val_meter[4]))
-    logger.info('Best: R@1: {:.1f} R@5: {:.1f} R@10: {:.1f} Rsum: {:.1f}'.format(best_val[0], best_val[1], best_val[2], best_val[4]))
+    logger.info('Best: R@1: {:.1f} R@5: {:.1f} R@10: {:.1f} R@100: {:.1f} Rsum: {:.1f}'.format(best_val[0], best_val[1], best_val[2], best_val[3], best_val[4]))
     logger.info('==========================================================================================================')
         
     return val_meter, best_val, es
 
 
-def validation(context_dataloader, query_eval_loader, model, val_criterion, logger, resume):
+def validation(context_dataloader, query_eval_loader, model, val_criterion, logger, sval):
 
-    val_meter = val_criterion(model, context_dataloader, query_eval_loader)
+    val_meter = val_criterion(model, context_dataloader, query_eval_loader, sval, 10)
     
     logger.info('==========================================================================================================')
-    logger.info('Testing from: {}'.format(resume))
+    # logger.info('Testing from: {}'.format(resume))
     logger.info('R@1: {:.1f}'.format(val_meter[0]))
     logger.info('R@5: {:.1f}'.format(val_meter[1]))
     logger.info('R@10: {:.1f}'.format(val_meter[2]))
+    logger.info('R@100: {:.1f}'.format(val_meter[3]))
     logger.info('Rsum: {:.1f}'.format(val_meter[4]))
     logger.info('==========================================================================================================')
 
@@ -142,6 +148,7 @@ def main(logger):
     current_epoch = -1
     es_cnt = 0
     best_val = [0., 0., 0., 0., 0.]
+    args.resume = "best.ckpt"
     if args.resume != '':
         logger.info('Resume from {}'.format(args.resume))
         _, model_state_dict, optimizer_state_dict, current_epoch, best_val = load_ckpt(args.resume)
@@ -151,17 +158,23 @@ def main(logger):
     criterion = get_losses(cfg)
     val_criterion = get_validations(cfg)
 
-    if args.eval:
-        if args.resume == '':
-            logger.info('No trained ckpt load !!!') 
-        else:
-            with torch.no_grad():
-                validation(context_dataloader, query_eval_loader, model, val_criterion, cfg, logger, args.resume)
-        exit(0)
+    # if args.eval:
+    if args.resume == '':
+        logger.info('No trained ckpt load !!!')
+    else:
+        with torch.no_grad():
+            data = torch.load('data.pt')
+            sval.deviation_feat_c = data['deviation_feat_c']
+            sval.deviation_feat_f = data['deviation_feat_f']
+            sval.sc_feat_c = data['sc_feat_c']
+            sval.sc_feat_f = data['sc_feat_f']
+            sval.sc_feat_n = data['sc_feat_n']
+            sval.total_feature_num = data['total_feature_num']
+            validation(context_dataloader, query_eval_loader, model, val_criterion, logger, sval)
+            exit(0)
+
 
     optimizer = get_opts(cfg, model, train_loader)
-    if args.resume != '':
-        optimizer.load_state_dict(optimizer_state_dict)
 
     for epoch in range(current_epoch + 1, cfg['n_epoch']):
 
