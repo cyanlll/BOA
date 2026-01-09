@@ -8,7 +8,8 @@ import string
 import re
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 nlp = spacy.load("en_core_web_sm")
 punctuation = string.punctuation
@@ -142,7 +143,6 @@ def map_dict(dict_, map, model):
             temp_score = 0
     return dict_
 
-
 def hf_list_construct(hf_dict):
     words_list = dict()
     for i, key in enumerate(hf_dict):
@@ -250,7 +250,6 @@ def keywords_cluster(keywords_dict, model, n_c):
     for i, sample_id in enumerate(key_list):
         keywords_dict[sample_id] = clusters_[i]
 
-    # 打印结果
     p_list = []
     for i in range(n_c):
         for word in keywords_dict:
@@ -275,15 +274,17 @@ def cluster_map(keywords, v_keywords, glove_model):
     return v_keywords
 
 if __name__ == "__main__":
-    # glove_root =
-    # glove_model_root =
-    # train_root =
-    cluster_num = 200  # cha 50
-    # glove_model = load_glove_model(glove_root, glove_model_root)
-    # keywords = keywords_dict_construct(train_root, glove_model)
-    # v_keywords = keywords_dict_construct(val_root, glove_model)
-    # keywords = keywords_cluster(keywords, glove_model, cluster_num)
-    # v_keywords = cluster_map(keywords, v_keywords, glove_model)
-    # data = {"keywords": keywords, "v_keywords": v_keywords, "cluster_num": cluster_num}
-    # with open(, 'w', encoding='utf-8') as f:
-    #     json.dump(data, f, indent=4)
+    glove_root = "../glove/glove.840B.300d.txt"
+    glove_model_root = "../glove/glove.840B.300d_model.pkl"
+    train_root = "../netdisk/tvr/TextData/tvrtrain.caption.txt"
+    val_root = "../netdisk/tvr/TextData/tvrval.caption.txt"
+
+    cluster_num = 200  
+    glove_model = load_glove_model(glove_root, glove_model_root)
+    keywords = keywords_dict_construct(train_root, glove_model)
+    v_keywords = keywords_dict_construct(val_root, glove_model)
+    keywords = keywords_cluster(keywords, glove_model, cluster_num)
+    v_keywords = cluster_map(keywords, v_keywords, glove_model)
+    data = {"keywords": keywords, "v_keywords": v_keywords, "cluster_num": cluster_num}
+    with open("../src/Sval/data/tvr/sval.json", 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
