@@ -1,6 +1,5 @@
 import os
 import yaml
-
 cfg = {}
 
 cfg['use_clip_feat'] = None
@@ -8,13 +7,14 @@ cfg['model_name'] = 'boa'
 cfg['collection'] = cfg['dataset_name'] = 'charades'
 cfg['collection_val'] = 'charades'
 cfg['seed'] = 9527
-# cfg['root'] =
-# cfg['data_root'] =
-# cfg['sval_root'] =
+cfg['root'] = '../src/Save/tmp'
+cfg['data_root'] = '../netdisk'
+cfg['sval_root'] = '../src/Sval/data'
 cfg['visual_feature'] = 'i3d_rgb_lgi'
 cfg['map_size'] = 32
 cfg['clip_scale_w'] = 0.5
 cfg['frame_scale_w'] = 0.5
+cfg["text_feat_dim"] = 1024
 
 cfg['model_root'] = os.path.join(cfg['root'], 'results', cfg['dataset_name'], cfg['model_name'])
 cfg['ckpt_path'] = os.path.join(cfg['model_root'], 'ckpt')
@@ -56,10 +56,11 @@ cfg['hidden_size'] = 384
 cfg['n_heads'] = 4
 cfg['initializer_range'] = 0.02
 cfg['top_k'] = 5
+cfg['input_drop'] = 0.25
+cfg['drop'] = 0.25
 
 cfg['num_workers'] = 1 if cfg['no_core_driver'] else cfg['num_workers']
 cfg['pin_memory'] = not cfg['no_pin_memory']
-
 
 if not os.path.exists(cfg['model_root']):
     os.makedirs(cfg['model_root'], exist_ok=True)
