@@ -8,9 +8,20 @@ cfg['model_name'] = 'boa'
 cfg['collection'] = cfg['dataset_name'] = 'activitynet'
 cfg['collection_val'] = 'activitynet'
 cfg['seed'] = 9527
-# cfg['root'] =
-# cfg['data_root'] =
-# cfg['sval_root'] =
+cfg['root'] = '../src/Save/tmp'
+if cfg['use_clip_feat']:
+    cfg['data_root'] = '../netdisk/clip'
+    cfg["text_feat_dim"] = 512
+    cfg["visual_feat_dim"] = 512
+else:
+    cfg['data_root'] = '../netdisk'
+    cfg["text_feat_dim"] = 1024
+cfg['sval_root'] = '../src/Sval/data'
+
+cfg['model_name'] = 'boa'
+cfg['collection'] = cfg['dataset_name'] = 'activitynet'
+cfg['collection_val'] = 'activitynet'
+cfg['seed'] = 9527
 
 cfg['visual_feature'] = 'i3d'
 cfg['map_size'] = 32
@@ -36,7 +47,6 @@ cfg['lr_warmup_proportion'] = 0.01
 cfg['wd'] = 0.01
 cfg['margin'] = 0.2
 
-
 # train
 cfg['n_epoch'] = 100
 cfg['max_es_cnt'] = 20
@@ -58,7 +68,9 @@ cfg['max_position_embeddings'] = 300
 cfg['hidden_size'] = 384
 cfg['n_heads'] = 4
 cfg['initializer_range'] = 0.01
-cfg['top_k'] = 5
+cfg['top_k'] = 5   
+cfg['input_drop'] = 0.3
+cfg['drop'] = 0.3
 
 
 cfg['num_workers'] = 1 if cfg['no_core_driver'] else cfg['num_workers']
