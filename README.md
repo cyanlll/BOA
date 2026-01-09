@@ -1,4 +1,8 @@
-# BOA
+# Bidirectional Cross-Modal Collaborative Alignment via Semantic-Guided Visual Embeddings for Partially Relevant Video Retrieval
+
+# Requiments
+Please install the necessary dependencies listed in requirements.txt.
+
 ## Training on ActivityNet Captions
 
 ```bash
