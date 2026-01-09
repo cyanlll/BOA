@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 from easydict import EasyDict as edict
 from Models.boa.model_components import BertAttention, LinearLayer, \
-                                            TrainablePositionalEncoding, PT, BertCrossAttention
+    TrainablePositionalEncoding, PT, BertCrossAttention
 
 
 class BOA_Net(nn.Module):
@@ -21,41 +21,41 @@ class BOA_Net(nn.Module):
         self.frame_pos_embed = TrainablePositionalEncoding(max_position_embeddings=config.max_ctx_l,
                                                           hidden_size=config.hidden_size, dropout=config.input_drop)
         #
-        self.query_input_proj = LinearLayer(config.visual_input_size, config.hidden_size, layer_norm=True,
+        self.query_input_proj = LinearLayer(config.text_input_size, config.hidden_size, layer_norm=True,
                                             dropout=config.input_drop, relu=True)
         self.query_encoder = BertAttention(edict(hidden_size=config.hidden_size, intermediate_size=config.hidden_size,
                                                  hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
                                                  attention_probs_dropout_prob=config.drop))
         self.query_encoder2 = BertAttention(edict(hidden_size=config.hidden_size, intermediate_size=config.hidden_size,
-                                                 hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
-                                                 attention_probs_dropout_prob=config.drop))
+                                                  hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
+                                                  attention_probs_dropout_prob=config.drop))
 
         self.clip_input_proj = LinearLayer(config.visual_input_size, config.hidden_size, layer_norm=True,
-                                            dropout=config.input_drop, relu=True)
+                                           dropout=config.input_drop, relu=True)
         self.clip_encoder = PT(edict(hidden_size=config.hidden_size, intermediate_size=config.hidden_size,
-                                                 hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
-                                                 attention_probs_dropout_prob=config.drop, frame_len=config.map_size,
+                                     hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
+                                     attention_probs_dropout_prob=config.drop, frame_len=config.map_size,
                                      sft_factor=config.sft_factor))
 
         self.frame_input_proj = LinearLayer(config.visual_input_size, config.hidden_size, layer_norm=True,
-                                             dropout=config.input_drop, relu=True)
+                                            dropout=config.input_drop, relu=True)
         self.frame_encoder_1 = PT(edict(hidden_size=config.hidden_size, intermediate_size=config.hidden_size,
-                                                 hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
-                                                 attention_probs_dropout_prob=config.drop, frame_len=config.max_ctx_l,
+                                        hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
+                                        attention_probs_dropout_prob=config.drop, frame_len=config.max_ctx_l,
                                         sft_factor=config.sft_factor))
 
         self.modular_vector_mapping = nn.Linear(config.hidden_size, out_features=1, bias=False)
 
         self.cac = BertCrossAttention(edict(hidden_size=config.hidden_size, intermediate_size=config.hidden_size,
-                                                 hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
-                                                 attention_probs_dropout_prob=config.drop, frame_len=config.map_size,
+                                            hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
+                                            attention_probs_dropout_prob=config.drop, frame_len=config.map_size,
                                             sft_factor=config.sft_factor))
         self.layer1c = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropoutc = nn.Dropout(config.drop)
         self.layer2c = nn.Linear(config.hidden_size, config.map_size)
         self.caf = BertCrossAttention(edict(hidden_size=config.hidden_size, intermediate_size=config.hidden_size,
-                                                 hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
-                                                 attention_probs_dropout_prob=config.drop, frame_len=config.max_ctx_l,
+                                            hidden_dropout_prob=config.drop, num_attention_heads=config.n_heads,
+                                            attention_probs_dropout_prob=config.drop, frame_len=config.max_ctx_l,
                                             sft_factor=config.sft_factor))
         self.layer1f = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropoutf = nn.Dropout(config.drop)
@@ -88,7 +88,6 @@ class BOA_Net(nn.Module):
         self.config.use_hard_negative = use_hard_negative
         self.config.hard_pool_size = hard_pool_size
 
-
     def forward(self, batch, epoch, sval):
 
         clip_video_feat = batch['clip_video_features']
@@ -109,10 +108,15 @@ class BOA_Net(nn.Module):
                       repeat(1, deviation_feat_f.shape[0]) - deviation_feat_f.unsqueeze(0).
                       repeat(sval.cluster_number, 1)).to(device)
 
+        # sc_feat_c_ = (sval.sc_feat_c / sval.sc_feat_n.unsqueeze(-1).
+        #               repeat(1, deviation_feat_c.shape[0])).to(device)
+        # sc_feat_f_ = (sval.sc_feat_f / sval.sc_feat_n.unsqueeze(-1).
+        #               repeat(1, deviation_feat_f.shape[0])).to(device)
+
         encoded_frame_feat, vid_proposal_feat = self.encode_context(
             clip_video_feat, frame_video_feat, frame_video_mask, (sc_feat_c_, sc_feat_f_))
 
-        clip_scale_scores, clip_scale_scores_, frame_scale_scores, frame_scale_scores_ , video_query\
+        clip_scale_scores, clip_scale_scores_, frame_scale_scores, frame_scale_scores_, video_query \
             = self.get_pred_from_raw_query(query_feat, query_mask, query_labels, vid_proposal_feat,
                                            encoded_frame_feat, (sc_feat_c_, sc_feat_f_),
                                            sval, (sc_masks_t, sc_masks_v), return_query_feats=True)
@@ -127,7 +131,6 @@ class BOA_Net(nn.Module):
 
         return [clip_scale_scores, clip_scale_scores_, label_dict, frame_scale_scores, frame_scale_scores_, video_query]
 
-
     def encode_query(self, query_feat, query_mask, new_feat, sc_mask):
 
         query_feat = self.query_input_proj(query_feat)
@@ -140,6 +143,7 @@ class BOA_Net(nn.Module):
             slice_mask = query_mask[i].sum()
             sc_feat_c = new_feat[0][sc_mask[i]]
             sc_feat_f = new_feat[1][sc_mask[i]]
+
             if int(slice_mask) + sc_feat_c.shape[0] >= d:
                 sc_feat_c = sc_feat_c[:sc_feat_c.shape[0] - (int(slice_mask) + sc_feat_c.shape[0] - d)]
                 sc_feat_f = sc_feat_f[:sc_feat_f.shape[0] - (int(slice_mask) + sc_feat_f.shape[0] - d)]
@@ -149,11 +153,17 @@ class BOA_Net(nn.Module):
 
         encoded_query_c = self.query_encoder(query_feat_c, query_mask.unsqueeze(1))
         encoded_query_f = self.query_encoder2(query_feat_f, query_mask.unsqueeze(1))
-        
+
         video_query_c = self.get_modularized_queries(encoded_query_c, query_mask)  # (N, D) * 1
         video_query_f = self.get_modularized_queries(encoded_query_f, query_mask)  # (N, D) * 1
 
-        return (video_query_c, video_query_f)
+        return (video_query_c, video_query_f), query_feat
+        # return (video_query_c, video_query_c), query_feat
+
+    # X = sc_feat_c.shape[0]
+    # shuffle_indices = torch.randperm(X)
+    # sc_feat_c = sc_feat_c[shuffle_indices]
+    # sc_feat_f = sc_feat_f[shuffle_indices]
 
     def encode_context(self, clip_video_feat, frame_video_feat, video_mask=None, sc_feats=None):
 
@@ -179,6 +189,7 @@ class BOA_Net(nn.Module):
         weight_c = F.softmax(weight_c.permute(0, 2, 1) / self.sft_factor, dim=-1)
         out_c = torch.sum(encoded_clip_feat * weight_c.unsqueeze(2).
                           repeat(1, 1, encoded_clip_feat.shape[2], 1), dim=-1)
+        # out_c = torch.mean(encoded_clip_feat, dim=-1)
 
         weight_token_f = video_feat[1].unsqueeze(1)
         weight_f = []
@@ -189,8 +200,11 @@ class BOA_Net(nn.Module):
         weight_f = F.softmax(weight_f.permute(0, 2, 1) / self.sft_factor, dim=-1)
         out_f = torch.sum(encoded_frame_feat * weight_f.unsqueeze(2).
                           repeat(1, 1, encoded_frame_feat.shape[2], 1), dim=-1)
+        # out_f = torch.mean(encoded_frame_feat, dim=-1)
 
         return out_f, out_c
+
+        # return frame_video_feat, clip_video_feat
 
     def feat_retrieval(self, clip_key_features, frame_key_features, sc_feats):
         device = clip_key_features.device
@@ -243,7 +257,6 @@ class BOA_Net(nn.Module):
         else:
             return encoder_layer(feat, mask)  # (N, L, D_hidden)
 
-
     def get_modularized_queries(self, encoded_query, query_mask):
         """
         Args:
@@ -255,7 +268,6 @@ class BOA_Net(nn.Module):
         modular_attention_scores = F.softmax(mask_logits(modular_attention_scores, query_mask.unsqueeze(2)), dim=1)
         modular_queries = torch.einsum("blm,bld->bmd", modular_attention_scores, encoded_query)  # (N, 2 or 1, D)
         return modular_queries.squeeze()
-
 
     @staticmethod
     def get_clip_scale_scores(modularied_query, context_feat):
@@ -279,12 +291,11 @@ class BOA_Net(nn.Module):
 
         return output_query_context_scores
 
-
     def get_pred_from_raw_query(self, query_feat, query_mask, query_labels=None,
                                 video_proposal_feat=None, encoded_frame_feat=None, ori_feat=None,
                                 sval=None, sc_mask=None, return_query_feats=False):
 
-        video_query = self.encode_query(query_feat, query_mask, ori_feat, sc_mask[0])
+        video_query, query_feat_o = self.encode_query(query_feat, query_mask, ori_feat, sc_mask[0])
 
         # get clip-level retrieval scores
         clip_scale_scores, index_c, clip_scores = self.get_clip_scale_scores(video_query[0], video_proposal_feat)
@@ -292,8 +303,8 @@ class BOA_Net(nn.Module):
 
         if return_query_feats:
             sval.enhance((video_proposal_feat.clone().detach(),
-                                          encoded_frame_feat.clone().detach()), sc_mask[1],
-                                         (index_c, index_f), query_labels)
+                          encoded_frame_feat.clone().detach()), sc_mask[1],
+                         (index_c, index_f), query_labels)
 
             clip_scale_scores_ = self.get_unnormalized_clip_scale_scores(video_query[0], video_proposal_feat)
             frame_scale_scores_ = self.get_unnormalized_clip_scale_scores(video_query[1], encoded_frame_feat)
