@@ -4,7 +4,7 @@
 Please install the necessary dependencies listed in requirements.txt.
 
 # Data Preparation
-Please download the data from [GMMFormer]([https://www.openai.com](https://github.com/huangmozhi9527/GMMFormer)) or [DL-DKD]([https://www.openai.com](https://github.com/HuiGuanLab/DL-DKD)). 
+Please download the data from [GMMFormer](https://github.com/huangmozhi9527/GMMFormer) or [DL-DKD](https://github.com/HuiGuanLab/DL-DKD). 
 
 ## Training on ActivityNet Captions
 
