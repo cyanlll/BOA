@@ -6,16 +6,24 @@ Please install the necessary dependencies listed in requirements.txt.
 # Data Preparation
 Please download the data from [GMMFormer](https://github.com/huangmozhi9527/GMMFormer) or [DL-DKD](https://github.com/HuiGuanLab/DL-DKD). 
 
-## Training on ActivityNet Captions
+#Training and Inference
+## Training and Inference on ActivityNet Captions
 
 ```bash
 cd src
 python main.py -d act --gpu 0
 
 ```
-## Training on Charades-STA
+## Training and Inference on Charades-STA
 
 ```bash
 cd src
 python main.py -d cha --gpu 0
+```
+
+## Training and Inference on TVR
+
+```bash
+cd src
+python main.py -d tvr --gpu 0
 ```
