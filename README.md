@@ -8,13 +8,13 @@ Official implementation of paper:
 Bidirectional Cross-Modal Collaborative Alignment via Semantic-Guided Visual Embeddings for Partially Relevant Video Retrieval
 
 ### Core idea
-!(./assets/Idea.png)
+![](./assets/Idea.png)
 
 Core idea for addressing the challenges in PRVR. Semantic–visual association library serves not only as a bridge to mitigate modality gaps but also
 provides the foundation for generating dynamic visual anchors to address partial mismatches between textual and video content.
 
 ### Overview
-!(./assets/Framework.png)
+![](./assets/Framework.png)
 
 Overview of the proposed architecture. We cluster keywords from the textual query set to construct a SVAL. Relevant visual features are selected
 based on their similarity to query features and used to update the library. The SGFP encodes visual features with the help of dynamically retrieved semantic
