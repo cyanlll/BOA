@@ -9,6 +9,28 @@ Please download the data from [GMMFormer](https://github.com/huangmozhi9527/GMMF
 #Training and Inference
 ## Training and Inference on ActivityNet Captions
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```bash
 cd src
 python main.py -d act --gpu 0
